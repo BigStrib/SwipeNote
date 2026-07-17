@@ -1,781 +1,831 @@
-const STORAGE_KEY = "swipenote-data-v1";
-const TRANSITION = "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
-const SWIPE_THRESHOLD = 50;
+(function () {
+    "use strict";
 
-const notesContainer = document.getElementById("notes-container");
-const noteCountEl = document.getElementById("note-count");
-const emptyState = document.getElementById("empty-state");
-const trashBtn = document.getElementById("trash-btn");
-const confirmModal = document.getElementById("confirm-modal");
-const confirmCancel = document.getElementById("confirm-cancel");
-const confirmDelete = document.getElementById("confirm-delete");
-const dotIndicators = document.getElementById("dot-indicators");
+    const STORAGE_NOTES = "swipenote-notes-v2";
+    const STORAGE_INDEX = "swipenote-index-v2";
+    const MIN_FONT = 10;
+    const MAX_FONT = 32;
+    const DEFAULT_FONT = 16;
+    const SWIPE_THRESHOLD = 40;
+    const ANIM_DURATION = 300;
+    const ANIM_EASE = "cubic-bezier(0.25,0.46,0.45,0.94)";
 
-let notes = loadNotes();
-let activeIndex = 0;
-let viewportHeight = window.innerHeight;
-let focusTimer = null;
-let recentlySwiped = false;
+    // DOM
+    const container = document.getElementById("notes-container");
+    const countEl = document.getElementById("note-count");
+    const emptyEl = document.getElementById("empty-state");
+    const trashBtn = document.getElementById("trash-btn");
+    const sizeUp = document.getElementById("size-up");
+    const sizeDown = document.getElementById("size-down");
+    const sizeLabel = document.getElementById("size-label");
+    const controlsLeft = document.getElementById("controls-left");
+    const modal = document.getElementById("confirm-modal");
+    const modalCancel = document.getElementById("confirm-cancel");
+    const modalDelete = document.getElementById("confirm-delete");
+    const dotsEl = document.getElementById("dot-indicators");
 
-// Touch
-let touchStartY = 0;
-let touchStartX = 0;
-let touchCurrentY = 0;
-let touchCurrentX = 0;
-let isTouchSwiping = false;
-let touchLocked = null;
+    // State
+    let notes = [];
+    let idx = 0;
+    let vh = window.innerHeight;
+    let animating = false;
 
-// Mouse
-let mouseIsDown = false;
-let mouseStartY = 0;
-let mouseCurrentY = 0;
-let mouseIsSwiping = false;
-let mouseDidMove = false;
+    // Touch state
+    let tStartY = 0;
+    let tStartX = 0;
+    let tLastY = 0;
+    let tLastX = 0;
+    let tActive = false;
+    let tDecided = false;
+    let tIsSwipe = false;
 
-// Wheel
-let wheelAccum = 0;
-let wheelTimer = null;
-
-init();
-
-function init() {
-    notesContainer.style.transition = TRANSITION;
-    bindEvents();
-    renderNotes();
-
-    if (notes.length > 0) {
-        activeIndex = clamp(activeIndex, 0, notes.length - 1);
-        goToNote(activeIndex, false);
-    } else {
-        updateUI();
-        hideTrash();
-    }
-}
-
-function bindEvents() {
-    notesContainer.addEventListener("click", onContainerClick);
-
-    // Touch
-    notesContainer.addEventListener("touchstart", onTouchStart, { passive: false });
-    notesContainer.addEventListener("touchmove", onTouchMove, { passive: false });
-    notesContainer.addEventListener("touchend", onTouchEnd, { passive: true });
-    notesContainer.addEventListener("touchcancel", onTouchEnd, { passive: true });
-
-    // Mouse
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
+    // Mouse state
+    let mDown = false;
+    let mStartY = 0;
+    let mLastY = 0;
+    let mDragging = false;
+    let mMoved = false;
 
     // Wheel
-    notesContainer.addEventListener("wheel", onWheel, { passive: false });
+    let wAccum = 0;
+    let wTimer = null;
 
-    // Keyboard
-    document.addEventListener("keydown", onKeyDown);
-
-    // Trash
-    trashBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openDeleteConfirm();
-    });
-
-    // Modal
-    confirmCancel.addEventListener("click", closeDeleteConfirm);
-    confirmDelete.addEventListener("click", deleteActiveNote);
-    confirmModal.addEventListener("click", (e) => {
-        if (e.target === confirmModal) closeDeleteConfirm();
-    });
-
-    // Viewport
-    window.addEventListener("resize", debounce(() => {
-        const editing = document.activeElement && document.activeElement.classList.contains("note-text");
-        if (!editing) updateViewport();
-    }, 150));
-    window.addEventListener("orientationchange", () => setTimeout(updateViewport, 300));
-    document.addEventListener("visibilitychange", saveNotes);
-}
-
-/* =====================
-   CLICK
-   ===================== */
-function onContainerClick(e) {
-    if (confirmModal.classList.contains("active")) return;
-    if (recentlySwiped) return;
-    if (mouseDidMove) return;
-
-    if (notes.length === 0) {
-        createNoteAfter(-1);
-        return;
+    // ---- INIT ----
+    load();
+    render();
+    idx = clamp(loadIndex(), 0, Math.max(0, notes.length - 1));
+    if (notes.length > 0) {
+        jumpTo(idx);
+        showControls();
+    } else {
+        setTransform(0);
+        updateUI();
+        hideControls();
     }
+    bind();
+    registerSW();
 
-    showTrash();
+    // ---- BIND ----
+    function bind() {
+        // Touch
+        document.addEventListener("touchstart", touchStart, { passive: false });
+        document.addEventListener("touchmove", touchMove, { passive: false });
+        document.addEventListener("touchend", touchEnd, { passive: true });
+        document.addEventListener("touchcancel", touchEnd, { passive: true });
 
-    const clickedCard = e.target.closest(".note-card");
-    if (clickedCard) {
-        const idx = findIndexById(clickedCard.dataset.id);
-        if (idx !== -1) {
-            activeIndex = idx;
-            updateDots();
-        }
-    }
+        // Mouse
+        document.addEventListener("mousedown", mouseStart);
+        document.addEventListener("mousemove", mouseMove);
+        document.addEventListener("mouseup", mouseEnd);
 
-    if (!e.target.closest(".note-text")) {
-        focusActiveNote(true);
-    }
-}
+        // Wheel
+        document.addEventListener("wheel", wheelHandler, { passive: false });
 
-/* =====================
-   TOUCH
-   ===================== */
-function onTouchStart(e) {
-    if (confirmModal.classList.contains("active")) return;
-    if (e.touches.length !== 1) return;
+        // Keyboard
+        document.addEventListener("keydown", keyHandler);
 
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-    touchCurrentY = touchStartY;
-    touchCurrentX = touchStartX;
-    isTouchSwiping = false;
-    touchLocked = null;
-}
+        // Click empty area
+        document.addEventListener("click", clickHandler);
 
-function onTouchMove(e) {
-    if (confirmModal.classList.contains("active")) return;
-    if (e.touches.length !== 1) return;
+        // Buttons
+        trashBtn.addEventListener("click", function (e) { e.stopPropagation(); openModal(); });
+        sizeUp.addEventListener("click", function (e) { e.stopPropagation(); changeFontSize(1); });
+        sizeDown.addEventListener("click", function (e) { e.stopPropagation(); changeFontSize(-1); });
+        modalCancel.addEventListener("click", closeModal);
+        modalDelete.addEventListener("click", deleteNote);
+        modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
 
-    touchCurrentY = e.touches[0].clientY;
-    touchCurrentX = e.touches[0].clientX;
-
-    const dy = touchCurrentY - touchStartY;
-    const dx = touchCurrentX - touchStartX;
-
-    if (!touchLocked) {
-        if (Math.abs(dy) < 10 && Math.abs(dx) < 10) return;
-
-        if (Math.abs(dy) >= Math.abs(dx)) {
-            if (notes.length > 0 && canSwipeNotes(dy)) {
-                touchLocked = "swipe";
-                isTouchSwiping = true;
-                blurActiveNote();
-            } else {
-                touchLocked = "scroll";
+        // Resize
+        window.addEventListener("resize", debounce(function () {
+            var editing = document.activeElement && document.activeElement.classList.contains("note-text");
+            if (!editing) {
+                vh = window.innerHeight;
+                sizeAllCards();
+                jumpTo(idx);
             }
-        } else {
-            touchLocked = "horizontal";
+        }, 200));
+
+        window.addEventListener("orientationchange", function () {
+            setTimeout(function () {
+                vh = window.innerHeight;
+                sizeAllCards();
+                jumpTo(idx);
+            }, 350);
+        });
+
+        document.addEventListener("visibilitychange", function () {
+            save();
+            saveIndex();
+        });
+    }
+
+    // ---- TOUCH ----
+    function touchStart(e) {
+        if (isModal()) return;
+        if (e.touches.length !== 1) return;
+        if (isButton(e.target)) return;
+
+        tStartY = e.touches[0].clientY;
+        tStartX = e.touches[0].clientX;
+        tLastY = tStartY;
+        tLastX = tStartX;
+        tActive = true;
+        tDecided = false;
+        tIsSwipe = false;
+    }
+
+    function touchMove(e) {
+        if (!tActive) return;
+        if (isModal()) { tActive = false; return; }
+        if (e.touches.length !== 1) return;
+
+        tLastY = e.touches[0].clientY;
+        tLastX = e.touches[0].clientX;
+
+        var dy = tLastY - tStartY;
+        var dx = tLastX - tStartX;
+        var ay = Math.abs(dy);
+        var ax = Math.abs(dx);
+
+        if (!tDecided) {
+            if (ay < 8 && ax < 8) return;
+            tDecided = true;
+
+            if (ay >= ax) {
+                var canSwipe = checkCanSwipe(dy);
+                if (canSwipe && notes.length > 0) {
+                    tIsSwipe = true;
+                    blurActive();
+                } else {
+                    tIsSwipe = false;
+                }
+            } else {
+                tIsSwipe = false;
+            }
+        }
+
+        if (tIsSwipe) {
+            e.preventDefault();
+            applyDrag(dy);
         }
     }
 
-    if (touchLocked === "swipe") {
-        e.preventDefault();
-        dragContainer(dy);
+    function touchEnd() {
+        if (!tActive) return;
+        var wasSwipe = tIsSwipe;
+        var dy = tLastY - tStartY;
+
+        tActive = false;
+        tDecided = false;
+        tIsSwipe = false;
+
+        if (wasSwipe) {
+            finishDrag(dy);
+        }
     }
-}
 
-function onTouchEnd() {
-    if (isTouchSwiping) {
-        const dy = touchCurrentY - touchStartY;
-        finishSwipe(dy);
+    // ---- MOUSE ----
+    function mouseStart(e) {
+        if (isModal()) return;
+        if (e.button !== 0) return;
+        if (isButton(e.target)) return;
+        if (e.target.closest(".note-text")) return;
+
+        mDown = true;
+        mStartY = e.clientY;
+        mLastY = e.clientY;
+        mDragging = false;
+        mMoved = false;
     }
 
-    isTouchSwiping = false;
-    touchLocked = null;
-}
+    function mouseMove(e) {
+        if (!mDown) return;
 
-/* =====================
-   MOUSE DRAG
-   ===================== */
-function onMouseDown(e) {
-    if (confirmModal.classList.contains("active")) return;
-    if (e.button !== 0) return;
+        mLastY = e.clientY;
+        var dy = mLastY - mStartY;
 
-    // Don't start drag on note-text, trash, or modal
-    if (e.target.closest(".note-text")) return;
-    if (e.target.closest("#trash-btn")) return;
-    if (e.target.closest(".modal-overlay")) return;
-
-    mouseIsDown = true;
-    mouseStartY = e.clientY;
-    mouseCurrentY = e.clientY;
-    mouseIsSwiping = false;
-    mouseDidMove = false;
-}
-
-function onMouseMove(e) {
-    if (!mouseIsDown) return;
-
-    mouseCurrentY = e.clientY;
-    const dy = mouseCurrentY - mouseStartY;
-
-    if (!mouseIsSwiping) {
-        if (Math.abs(dy) > 8) {
-            if (notes.length === 0) {
-                mouseIsDown = false;
+        if (!mDragging) {
+            if (Math.abs(dy) > 8 && notes.length > 0) {
+                mDragging = true;
+                mMoved = true;
+                blurActive();
+            } else {
                 return;
             }
-            mouseIsSwiping = true;
-            mouseDidMove = true;
-            blurActiveNote();
-            e.preventDefault();
         }
-        return;
-    }
 
-    e.preventDefault();
-    dragContainer(dy);
-}
-
-function onMouseUp() {
-    if (!mouseIsDown) return;
-
-    const wasSwiping = mouseIsSwiping;
-    const dy = mouseCurrentY - mouseStartY;
-
-    mouseIsDown = false;
-    mouseIsSwiping = false;
-
-    if (wasSwiping) {
-        finishSwipe(dy);
-    }
-
-    // Reset mouseDidMove after a tick so click handler can check it
-    setTimeout(() => {
-        mouseDidMove = false;
-    }, 50);
-}
-
-/* =====================
-   SHARED DRAG / SWIPE
-   ===================== */
-function dragContainer(dy) {
-    let drag = dy;
-
-    const goingUp = dy < 0;
-    const goingDown = dy > 0;
-
-    const atFirst = activeIndex === 0 && goingDown;
-    const atLast = activeIndex === notes.length - 1 && goingUp;
-
-    // Resistance at edges (but still allow drag to feel responsive)
-    if (atFirst) {
-        drag = dy / 4;
-    } else if (atLast) {
-        // At last note: light resistance if note has content (will create new)
-        // Heavy resistance if note is empty (won't create)
-        if (currentNoteIsEmpty()) {
-            drag = dy / 5;
-        } else {
-            drag = dy / 2;
-        }
-    }
-
-    const pos = (-activeIndex * viewportHeight) + drag;
-    notesContainer.style.transition = "none";
-    notesContainer.style.transform = `translateY(${pos}px)`;
-}
-
-function finishSwipe(dy) {
-    notesContainer.style.transition = TRANSITION;
-
-    if (Math.abs(dy) < SWIPE_THRESHOLD) {
-        goToNote(activeIndex, true);
-        return;
-    }
-
-    flagSwipe();
-
-    if (dy < 0) {
-        // Dragged UP → go next / create
-        navigateNext();
-    } else {
-        // Dragged DOWN → go previous / create above
-        navigatePrevious();
-    }
-}
-
-function canSwipeNotes(dy) {
-    const el = getActiveTextEl();
-    if (!el) return true;
-
-    const hasScroll = el.scrollHeight > el.clientHeight + 2;
-    if (!hasScroll) return true;
-
-    const atTop = el.scrollTop <= 1;
-    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-
-    if (dy > 0) return atTop;
-    if (dy < 0) return atBottom;
-
-    return true;
-}
-
-/* =====================
-   WHEEL
-   ===================== */
-function onWheel(e) {
-    if (confirmModal.classList.contains("active")) return;
-    if (notes.length === 0) return;
-
-    const el = getActiveTextEl();
-    if (el) {
-        const hasScroll = el.scrollHeight > el.clientHeight + 2;
-        if (hasScroll) {
-            const atTop = el.scrollTop <= 1;
-            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-            if (e.deltaY < 0 && !atTop) return;
-            if (e.deltaY > 0 && !atBottom) return;
-        }
-    }
-
-    e.preventDefault();
-    wheelAccum += e.deltaY;
-
-    clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(() => {
-        if (Math.abs(wheelAccum) > 50) {
-            flagSwipe();
-            if (wheelAccum > 0) navigateNext();
-            else navigatePrevious();
-        }
-        wheelAccum = 0;
-    }, 100);
-}
-
-/* =====================
-   KEYBOARD
-   ===================== */
-function onKeyDown(e) {
-    if (confirmModal.classList.contains("active")) {
-        if (e.key === "Escape") closeDeleteConfirm();
-        if (e.key === "Enter") deleteActiveNote();
-        return;
-    }
-
-    const editing = document.activeElement && document.activeElement.classList.contains("note-text");
-
-    if ((e.ctrlKey || e.metaKey) && (e.key === "Delete" || e.key === "Backspace")) {
         e.preventDefault();
-        if (notes.length > 0) openDeleteConfirm();
-        return;
+        applyDrag(dy);
     }
 
-    if (!editing) {
-        if (e.key === "ArrowUp" || e.key === "PageUp") {
-            e.preventDefault();
-            navigatePrevious();
-            return;
+    function mouseEnd() {
+        if (!mDown) return;
+        var wasDragging = mDragging;
+        var dy = mLastY - mStartY;
+
+        mDown = false;
+        mDragging = false;
+
+        if (wasDragging) {
+            finishDrag(dy);
         }
-        if (e.key === "ArrowDown" || e.key === "PageDown") {
-            e.preventDefault();
-            navigateNext();
-            return;
-        }
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            if (notes.length === 0) {
-                createNoteAfter(-1);
+
+        setTimeout(function () { mMoved = false; }, 60);
+    }
+
+    // ---- SHARED DRAG ----
+    function applyDrag(dy) {
+        var drag = dy;
+
+        if (idx === 0 && dy > 0) {
+            if (currentEmpty()) {
+                drag = dy / 5;
             } else {
-                focusActiveNote(true);
+                drag = dy / 2.5;
+            }
+        }
+
+        if (idx === notes.length - 1 && dy < 0) {
+            if (currentEmpty()) {
+                drag = dy / 5;
+            } else {
+                drag = dy / 2.5;
+            }
+        }
+
+        var pos = -(idx * vh) + drag;
+        container.style.transition = "none";
+        container.style.transform = "translateY(" + pos + "px)";
+    }
+
+    function finishDrag(dy) {
+        if (animating) return;
+
+        if (Math.abs(dy) < SWIPE_THRESHOLD) {
+            animateTo(idx, true);
+            return;
+        }
+
+        if (dy < 0) {
+            goNext();
+        } else {
+            goPrev();
+        }
+    }
+
+    function checkCanSwipe(dy) {
+        if (notes.length === 0) return true;
+
+        var el = activeTextEl();
+        if (!el) return true;
+
+        var scrollable = el.scrollHeight > el.clientHeight + 2;
+        if (!scrollable) return true;
+
+        if (dy > 0) return el.scrollTop <= 1;
+        if (dy < 0) return el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+
+        return true;
+    }
+
+    // ---- WHEEL ----
+    function wheelHandler(e) {
+        if (isModal()) return;
+        if (notes.length === 0) return;
+
+        var el = activeTextEl();
+        if (el) {
+            var scrollable = el.scrollHeight > el.clientHeight + 2;
+            if (scrollable) {
+                if (e.deltaY < 0 && el.scrollTop > 1) return;
+                if (e.deltaY > 0 && el.scrollTop + el.clientHeight < el.scrollHeight - 2) return;
+            }
+        }
+
+        e.preventDefault();
+        wAccum += e.deltaY;
+
+        clearTimeout(wTimer);
+        wTimer = setTimeout(function () {
+            if (Math.abs(wAccum) > 40) {
+                if (wAccum > 0) goNext();
+                else goPrev();
+            }
+            wAccum = 0;
+        }, 80);
+    }
+
+    // ---- KEYBOARD ----
+    function keyHandler(e) {
+        if (isModal()) {
+            if (e.key === "Escape") closeModal();
+            if (e.key === "Enter") deleteNote();
+            return;
+        }
+
+        var editing = document.activeElement && document.activeElement.classList.contains("note-text");
+
+        if ((e.ctrlKey || e.metaKey) && (e.key === "Delete" || e.key === "Backspace")) {
+            e.preventDefault();
+            if (notes.length > 0) openModal();
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key === "=") {
+            e.preventDefault();
+            changeFontSize(1);
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+            e.preventDefault();
+            changeFontSize(-1);
+            return;
+        }
+
+        if (!editing) {
+            if (e.key === "ArrowUp" || e.key === "PageUp") {
+                e.preventDefault();
+                goPrev();
+                return;
+            }
+            if (e.key === "ArrowDown" || e.key === "PageDown") {
+                e.preventDefault();
+                goNext();
+                return;
+            }
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (notes.length === 0) {
+                    addNote(-1);
+                } else {
+                    focusActive(true);
+                }
             }
         }
     }
-}
 
-/* =====================
-   NAVIGATION
-   ===================== */
-function navigateNext() {
-    if (notes.length === 0) {
-        createNoteAfter(-1);
-        return;
+    // ---- CLICK ----
+    function clickHandler(e) {
+        if (isModal()) return;
+        if (mMoved) return;
+        if (isButton(e.target)) return;
+
+        if (notes.length === 0) {
+            addNote(-1);
+            return;
+        }
+
+        showControls();
+
+        if (!e.target.closest(".note-text")) {
+            focusActive(true);
+        }
     }
 
-    if (activeIndex < notes.length - 1) {
-        goToNote(activeIndex + 1, true, true);
-        return;
-    }
+    // ---- NAVIGATION ----
+    function goNext() {
+        if (animating) return;
+        if (notes.length === 0) { addNote(-1); return; }
 
-    // On last note
-    if (!currentNoteIsEmpty()) {
-        createNoteAfter(activeIndex);
-    } else {
-        goToNote(activeIndex, true, true);
-    }
-}
-
-function navigatePrevious() {
-    if (notes.length === 0) return;
-
-    if (activeIndex > 0) {
-        goToNote(activeIndex - 1, true, true);
-        return;
-    }
-
-    // Already at first note — create a new note ABOVE it
-    if (!currentNoteIsEmpty()) {
-        createNoteBefore(activeIndex);
-    } else {
-        goToNote(0, true, true);
-    }
-}
-
-function goToNote(index, animate = true, focusAfter = false) {
-    if (notes.length === 0) {
-        notesContainer.style.transform = "translateY(0px)";
-        updateUI();
-        hideTrash();
-        return;
-    }
-
-    activeIndex = clamp(index, 0, notes.length - 1);
-
-    notesContainer.style.transition = animate ? TRANSITION : "none";
-    notesContainer.style.transform = `translateY(${-activeIndex * viewportHeight}px)`;
-
-    updateUI();
-    showTrash();
-
-    if (!animate) {
-        requestAnimationFrame(() => {
-            notesContainer.style.transition = TRANSITION;
-        });
-    }
-
-    if (focusAfter) {
-        clearTimeout(focusTimer);
-        focusTimer = setTimeout(() => focusActiveNote(true), animate ? 200 : 50);
-    }
-}
-
-/* =====================
-   CRUD
-   ===================== */
-function createNoteAfter(index) {
-    const note = { id: createId(), text: "", created: Date.now() };
-    const at = index + 1;
-    notes.splice(at, 0, note);
-    saveNotes();
-    renderNotes();
-    activeIndex = at;
-    goToNote(activeIndex, true, true);
-}
-
-function createNoteBefore(index) {
-    const note = { id: createId(), text: "", created: Date.now() };
-    notes.splice(index, 0, note);
-    saveNotes();
-    renderNotes();
-    // The new note is now at `index`, old note moved to `index + 1`
-    activeIndex = index;
-    goToNote(activeIndex, true, true);
-}
-
-function deleteActiveNote() {
-    if (notes.length === 0) {
-        closeDeleteConfirm();
-        return;
-    }
-
-    notes.splice(activeIndex, 1);
-    activeIndex = clamp(activeIndex, 0, Math.max(0, notes.length - 1));
-
-    saveNotes();
-    confirmModal.classList.remove("active");
-    renderNotes();
-
-    if (notes.length > 0) {
-        goToNote(activeIndex, false, true);
-    } else {
-        notesContainer.style.transform = "translateY(0px)";
-        updateUI();
-        hideTrash();
-    }
-}
-
-function openDeleteConfirm() {
-    if (notes.length === 0) return;
-    blurActiveNote();
-    confirmModal.classList.add("active");
-}
-
-function closeDeleteConfirm() {
-    confirmModal.classList.remove("active");
-    if (notes.length > 0) {
-        setTimeout(() => focusActiveNote(false), 50);
-    }
-}
-
-/* =====================
-   RENDER
-   ===================== */
-function renderNotes() {
-    const scrolls = getScrollPositions();
-
-    notesContainer.querySelectorAll(".note-card").forEach((c) => c.remove());
-
-    notes.forEach((note, i) => {
-        const card = document.createElement("section");
-        card.className = "note-card";
-        card.dataset.id = note.id;
-        card.style.height = `${viewportHeight}px`;
-        card.style.minHeight = `${viewportHeight}px`;
-
-        const text = document.createElement("div");
-        text.className = "note-text";
-        text.contentEditable = "true";
-        text.spellcheck = true;
-        text.dataset.id = note.id;
-        text.setAttribute("aria-label", `Note ${i + 1}`);
-        text.setAttribute("autocapitalize", "sentences");
-        text.setAttribute("autocomplete", "off");
-        text.setAttribute("autocorrect", "on");
-        text.textContent = note.text || "";
-
-        text.addEventListener("focus", onNoteFocus);
-        text.addEventListener("input", onNoteInput);
-        text.addEventListener("blur", onNoteBlur);
-        text.addEventListener("paste", onNotePaste);
-
-        card.addEventListener("click", (e) => {
-            showTrash();
-            if (e.target === card) {
-                text.focus();
-                placeCursorAtEnd(text);
+        if (idx < notes.length - 1) {
+            animateTo(idx + 1, true, true);
+        } else {
+            if (!currentEmpty()) {
+                addNoteAfter(idx);
+            } else {
+                animateTo(idx, true, true);
             }
+        }
+    }
+
+    function goPrev() {
+        if (animating) return;
+        if (notes.length === 0) return;
+
+        if (idx > 0) {
+            animateTo(idx - 1, true, true);
+        } else {
+            if (!currentEmpty()) {
+                addNoteBefore(idx);
+            } else {
+                animateTo(0, true, true);
+            }
+        }
+    }
+
+    function jumpTo(i) {
+        idx = clamp(i, 0, Math.max(0, notes.length - 1));
+        setTransform(-(idx * vh));
+        updateUI();
+        showControls();
+        saveIndex();
+        updateFontLabel();
+    }
+
+    function animateTo(i, animate, focusAfter) {
+        if (notes.length === 0) {
+            setTransform(0);
+            updateUI();
+            hideControls();
+            return;
+        }
+
+        idx = clamp(i, 0, notes.length - 1);
+
+        if (animate) {
+            animating = true;
+            container.style.transition = "transform " + ANIM_DURATION + "ms " + ANIM_EASE;
+        } else {
+            container.style.transition = "none";
+        }
+
+        container.style.transform = "translateY(" + -(idx * vh) + "px)";
+
+        updateUI();
+        showControls();
+        saveIndex();
+        updateFontLabel();
+
+        if (animate) {
+            setTimeout(function () {
+                animating = false;
+                container.style.transition = "none";
+                if (focusAfter) focusActive(true);
+            }, ANIM_DURATION + 20);
+        } else {
+            if (focusAfter) {
+                setTimeout(function () { focusActive(true); }, 30);
+            }
+        }
+    }
+
+    function setTransform(px) {
+        container.style.transition = "none";
+        container.style.transform = "translateY(" + px + "px)";
+    }
+
+    // ---- CRUD ----
+    function addNote(afterIndex) {
+        var n = makeNote();
+        var at = afterIndex + 1;
+        notes.splice(at, 0, n);
+        save();
+        render();
+        animateTo(at, true, true);
+    }
+
+    function addNoteAfter(i) {
+        var n = makeNote();
+        notes.splice(i + 1, 0, n);
+        save();
+        render();
+        animateTo(i + 1, true, true);
+    }
+
+    function addNoteBefore(i) {
+        var n = makeNote();
+        notes.splice(i, 0, n);
+        save();
+        render();
+        // New note is at i, old note moved to i+1. Go to new note at i.
+        animateTo(i, true, true);
+    }
+
+    function deleteNote() {
+        if (notes.length === 0) { closeModal(); return; }
+
+        notes.splice(idx, 1);
+        idx = clamp(idx, 0, Math.max(0, notes.length - 1));
+
+        save();
+        closeModal();
+        render();
+
+        if (notes.length > 0) {
+            jumpTo(idx);
+            setTimeout(function () { focusActive(true); }, 50);
+        } else {
+            setTransform(0);
+            updateUI();
+            hideControls();
+        }
+    }
+
+    function makeNote() {
+        return {
+            id: uid(),
+            text: "",
+            fontSize: DEFAULT_FONT,
+            created: Date.now()
+        };
+    }
+
+    // ---- FONT SIZE ----
+    function changeFontSize(dir) {
+        if (notes.length === 0) return;
+        var note = notes[idx];
+        if (!note) return;
+
+        var size = (note.fontSize || DEFAULT_FONT) + dir;
+        size = clamp(size, MIN_FONT, MAX_FONT);
+        note.fontSize = size;
+
+        var el = activeTextEl();
+        if (el) el.style.fontSize = size + "px";
+
+        sizeLabel.textContent = size;
+        save();
+    }
+
+    function updateFontLabel() {
+        if (notes.length === 0) {
+            sizeLabel.textContent = DEFAULT_FONT;
+            return;
+        }
+        var note = notes[idx];
+        var size = note ? (note.fontSize || DEFAULT_FONT) : DEFAULT_FONT;
+        sizeLabel.textContent = size;
+    }
+
+    // ---- RENDER ----
+    function render() {
+        container.innerHTML = "";
+
+        notes.forEach(function (note, i) {
+            var card = document.createElement("div");
+            card.className = "note-card";
+            card.dataset.id = note.id;
+            card.style.height = vh + "px";
+
+            var text = document.createElement("div");
+            text.className = "note-text";
+            text.contentEditable = "true";
+            text.spellcheck = true;
+            text.dataset.id = note.id;
+            text.dataset.index = i;
+            text.setAttribute("autocapitalize", "sentences");
+            text.setAttribute("autocomplete", "off");
+            text.setAttribute("autocorrect", "on");
+
+            var fs = note.fontSize || DEFAULT_FONT;
+            text.style.fontSize = fs + "px";
+            text.textContent = note.text || "";
+
+            text.addEventListener("focus", onFocus);
+            text.addEventListener("input", onInput);
+            text.addEventListener("blur", onBlur);
+            text.addEventListener("paste", onPaste);
+
+            // Prevent touch events on note-text from triggering page swipe
+            text.addEventListener("touchstart", function (e) {
+                // Let the text handle its own touch unless we need to swipe
+            }, { passive: true });
+
+            card.appendChild(text);
+            container.appendChild(card);
         });
 
-        card.appendChild(text);
-        notesContainer.appendChild(card);
-    });
+        sizeAllCards();
+        updateUI();
+    }
 
-    updateViewport(false);
-    restoreScrollPositions(scrolls);
-    updateUI();
+    function sizeAllCards() {
+        vh = window.innerHeight;
+        var cards = container.querySelectorAll(".note-card");
+        for (var i = 0; i < cards.length; i++) {
+            cards[i].style.height = vh + "px";
+        }
+    }
 
-    notes.length > 0 ? showTrash() : hideTrash();
-}
+    function onFocus(e) {
+        var i = findIndex(e.currentTarget.dataset.id);
+        if (i !== -1) {
+            idx = i;
+            updateDots();
+            showControls();
+            updateFontLabel();
+            saveIndex();
+        }
+    }
 
-function onNoteFocus(e) {
-    const idx = findIndexById(e.currentTarget.dataset.id);
-    if (idx !== -1) {
-        activeIndex = idx;
+    function onInput(e) {
+        var el = e.currentTarget;
+        var i = findIndex(el.dataset.id);
+        if (i === -1) return;
+
+        var t = getText(el);
+        notes[i].text = t;
+        if (t.trim() === "") { el.innerHTML = ""; notes[i].text = ""; }
+        save();
+    }
+
+    function onBlur(e) {
+        var el = e.currentTarget;
+        var i = findIndex(el.dataset.id);
+        if (i === -1) return;
+
+        var t = getText(el);
+        notes[i].text = t.trim() === "" ? "" : t;
+        if (t.trim() === "") el.innerHTML = "";
+        save();
+    }
+
+    function onPaste(e) {
+        e.preventDefault();
+        var t = (e.clipboardData || window.clipboardData).getData("text/plain");
+        insertText(t);
+    }
+
+    // ---- UI ----
+    function updateUI() {
+        updateCount();
         updateDots();
-        showTrash();
-    }
-}
-
-function onNoteInput(e) {
-    const el = e.currentTarget;
-    const idx = findIndexById(el.dataset.id);
-    if (idx === -1) return;
-
-    const text = getEditableText(el);
-    notes[idx].text = text;
-
-    if (text.trim() === "") {
-        el.innerHTML = "";
-        notes[idx].text = "";
+        updateEmpty();
+        updateFontLabel();
     }
 
-    saveNotes();
-}
-
-function onNoteBlur(e) {
-    const el = e.currentTarget;
-    const idx = findIndexById(el.dataset.id);
-    if (idx === -1) return;
-
-    const text = getEditableText(el);
-    notes[idx].text = text.trim() === "" ? "" : text;
-    if (text.trim() === "") el.innerHTML = "";
-
-    saveNotes();
-}
-
-function onNotePaste(e) {
-    e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData("text/plain");
-    insertTextAtCursor(text);
-}
-
-/* =====================
-   UI UPDATES
-   ===================== */
-function updateUI() {
-    updateCount();
-    updateDots();
-    updateEmptyState();
-}
-
-function updateCount() {
-    const c = notes.length;
-    noteCountEl.textContent = `${c} ${c === 1 ? "note" : "notes"}`;
-}
-
-function updateEmptyState() {
-    emptyState.classList.toggle("hidden", notes.length > 0);
-}
-
-function updateDots() {
-    dotIndicators.innerHTML = "";
-    if (notes.length <= 1) return;
-
-    const maxDots = 20;
-
-    if (notes.length <= maxDots) {
-        notes.forEach((_, i) => {
-            const dot = document.createElement("div");
-            dot.className = "dot" + (i === activeIndex ? " active" : "");
-            dotIndicators.appendChild(dot);
-        });
-    } else {
-        const label = document.createElement("span");
-        label.style.cssText = "font-size:10px;color:#555;letter-spacing:1px;";
-        label.textContent = `${activeIndex + 1} / ${notes.length}`;
-        dotIndicators.appendChild(label);
+    function updateCount() {
+        var c = notes.length;
+        countEl.textContent = c + " " + (c === 1 ? "note" : "notes");
     }
-}
 
-function showTrash() {
-    if (notes.length === 0) { hideTrash(); return; }
-    trashBtn.classList.add("visible");
-}
-
-function hideTrash() {
-    trashBtn.classList.remove("visible");
-}
-
-/* =====================
-   HELPERS
-   ===================== */
-function focusActiveNote(cursorEnd = false) {
-    if (confirmModal.classList.contains("active")) return;
-    const el = getActiveTextEl();
-    if (!el) return;
-
-    el.focus();
-    if (cursorEnd) requestAnimationFrame(() => placeCursorAtEnd(el));
-    showTrash();
-}
-
-function blurActiveNote() {
-    const el = getActiveTextEl();
-    if (el) el.blur();
-}
-
-function getActiveTextEl() {
-    const all = notesContainer.querySelectorAll(".note-text");
-    return all[activeIndex] || null;
-}
-
-function currentNoteIsEmpty() {
-    const note = notes[activeIndex];
-    return !note || note.text.trim() === "";
-}
-
-function updateViewport(keepTransform = true) {
-    viewportHeight = window.innerHeight;
-
-    notesContainer.querySelectorAll(".note-card").forEach((card) => {
-        card.style.height = `${viewportHeight}px`;
-        card.style.minHeight = `${viewportHeight}px`;
-    });
-
-    if (keepTransform && notes.length > 0) {
-        notesContainer.style.transform = `translateY(${-activeIndex * viewportHeight}px)`;
+    function updateEmpty() {
+        emptyEl.classList.toggle("hidden", notes.length > 0);
     }
-}
 
-function getEditableText(el) {
-    let t = (el.innerText || "").replace(/\u200B/g, "").replace(/\r/g, "");
-    if (t === "\n") return "";
-    if (t.endsWith("\n")) t = t.slice(0, -1);
-    return t;
-}
+    function updateDots() {
+        dotsEl.innerHTML = "";
+        if (notes.length <= 1) return;
 
-function placeCursorAtEnd(el) {
-    const sel = window.getSelection();
-    if (!sel) return;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-}
+        if (notes.length <= 20) {
+            for (var i = 0; i < notes.length; i++) {
+                var d = document.createElement("div");
+                d.className = "dot" + (i === idx ? " active" : "");
+                dotsEl.appendChild(d);
+            }
+        } else {
+            var label = document.createElement("span");
+            label.className = "dot-label";
+            label.textContent = (idx + 1) + " / " + notes.length;
+            dotsEl.appendChild(label);
+        }
+    }
 
-function insertTextAtCursor(text) {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    range.insertNode(document.createTextNode(text));
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-}
+    function showControls() {
+        if (notes.length === 0) { hideControls(); return; }
+        trashBtn.classList.add("visible");
+        controlsLeft.classList.add("visible");
+    }
 
-function getScrollPositions() {
-    const map = new Map();
-    notesContainer.querySelectorAll(".note-card").forEach((card) => {
-        const t = card.querySelector(".note-text");
-        if (t) map.set(card.dataset.id, t.scrollTop);
-    });
-    return map;
-}
+    function hideControls() {
+        trashBtn.classList.remove("visible");
+        controlsLeft.classList.remove("visible");
+    }
 
-function restoreScrollPositions(map) {
-    notesContainer.querySelectorAll(".note-card").forEach((card) => {
-        const t = card.querySelector(".note-text");
-        if (t && map.has(card.dataset.id)) t.scrollTop = map.get(card.dataset.id);
-    });
-}
+    function openModal() {
+        if (notes.length === 0) return;
+        blurActive();
+        modal.classList.add("active");
+    }
 
-function findIndexById(id) {
-    return notes.findIndex((n) => n.id === id);
-}
+    function closeModal() {
+        modal.classList.remove("active");
+        if (notes.length > 0) {
+            setTimeout(function () { focusActive(false); }, 50);
+        }
+    }
 
-function flagSwipe() {
-    recentlySwiped = true;
-    setTimeout(() => { recentlySwiped = false; }, 300);
-}
+    function isModal() {
+        return modal.classList.contains("active");
+    }
 
-function clamp(v, min, max) {
-    return Math.max(min, Math.min(max, v));
-}
+    // ---- HELPERS ----
+    function focusActive(cursorEnd) {
+        if (isModal()) return;
+        var el = activeTextEl();
+        if (!el) return;
+        el.focus();
+        if (cursorEnd) requestAnimationFrame(function () { cursorToEnd(el); });
+        showControls();
+    }
 
-function debounce(fn, ms) {
-    let t;
-    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
-}
+    function blurActive() {
+        var el = activeTextEl();
+        if (el) el.blur();
+    }
 
-/* =====================
-   STORAGE
-   ===================== */
-function saveNotes() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
-    catch (e) { console.warn("SwipeNote: save failed", e); }
-    updateCount();
-}
+    function activeTextEl() {
+        var cards = container.querySelectorAll(".note-text");
+        return cards[idx] || null;
+    }
 
-function loadNotes() {
-    try {
-        const d = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (!Array.isArray(d)) return [];
-        return d.map((n) => ({
-            id: String(n.id || createId()),
-            text: typeof n.text === "string" ? n.text : "",
-            created: n.created || Date.now()
-        }));
-    } catch { return []; }
-}
+    function currentEmpty() {
+        var n = notes[idx];
+        return !n || n.text.trim() === "";
+    }
 
-function createId() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return `sn-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
+    function isButton(target) {
+        return target.closest("#trash-btn") ||
+               target.closest("#size-up") ||
+               target.closest("#size-down") ||
+               target.closest("#controls-left") ||
+               target.closest(".modal-overlay");
+    }
 
-/* =====================
-   SERVICE WORKER
-   ===================== */
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
-    });
-}
+    function getText(el) {
+        var t = (el.innerText || "").replace(/\u200B/g, "").replace(/\r/g, "");
+        if (t === "\n") return "";
+        if (t.endsWith("\n")) t = t.slice(0, -1);
+        return t;
+    }
+
+    function cursorToEnd(el) {
+        var sel = window.getSelection();
+        if (!sel) return;
+        var r = document.createRange();
+        r.selectNodeContents(el);
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+    }
+
+    function insertText(text) {
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        var r = sel.getRangeAt(0);
+        r.deleteContents();
+        r.insertNode(document.createTextNode(text));
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+    }
+
+    function findIndex(id) {
+        for (var i = 0; i < notes.length; i++) {
+            if (notes[i].id === id) return i;
+        }
+        return -1;
+    }
+
+    function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    function debounce(fn, ms) {
+        var t;
+        return function () {
+            var a = arguments, self = this;
+            clearTimeout(t);
+            t = setTimeout(function () { fn.apply(self, a); }, ms);
+        };
+    }
+
+    function uid() {
+        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return "sn-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+    }
+
+    // ---- STORAGE ----
+    function save() {
+        try { localStorage.setItem(STORAGE_NOTES, JSON.stringify(notes)); } catch (e) { }
+        updateCount();
+    }
+
+    function load() {
+        try {
+            var d = JSON.parse(localStorage.getItem(STORAGE_NOTES));
+            if (!Array.isArray(d)) { notes = []; return; }
+            notes = d.map(function (n) {
+                return {
+                    id: String(n.id || uid()),
+                    text: typeof n.text === "string" ? n.text : "",
+                    fontSize: typeof n.fontSize === "number" ? clamp(n.fontSize, MIN_FONT, MAX_FONT) : DEFAULT_FONT,
+                    created: n.created || Date.now()
+                };
+            });
+        } catch (e) {
+            notes = [];
+        }
+    }
+
+    function saveIndex() {
+        try { localStorage.setItem(STORAGE_INDEX, String(idx)); } catch (e) { }
+    }
+
+    function loadIndex() {
+        try {
+            var v = parseInt(localStorage.getItem(STORAGE_INDEX), 10);
+            return isNaN(v) ? 0 : v;
+        } catch (e) { return 0; }
+    }
+
+    // ---- SW ----
+    function registerSW() {
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker.register("sw.js").catch(function () { });
+            });
+        }
+    }
+
+})();

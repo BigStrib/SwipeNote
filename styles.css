@@ -1,4 +1,3 @@
-/* ---- RESET & BASE ---- */
 * {
     margin: 0;
     padding: 0;
@@ -8,11 +7,13 @@
 
 html, body {
     height: 100%;
+    width: 100%;
     overflow: hidden;
     background: #000;
     color: #999;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    touch-action: pan-y;
+    touch-action: none;
+    overscroll-behavior: none;
     user-select: none;
     -webkit-user-select: none;
 }
@@ -39,17 +40,11 @@ html, body {
 
 /* ---- NOTES CONTAINER ---- */
 #notes-container {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     will-change: transform;
-    cursor: default;
 }
 
 /* ---- EMPTY STATE ---- */
@@ -65,17 +60,24 @@ html, body {
 }
 
 .empty-title {
-    font-size: 20px;
+    font-size: 22px;
     color: #444;
     font-weight: 600;
     letter-spacing: 1px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .empty-hint {
-    font-size: 13px;
+    font-size: 14px;
     color: #2a2a2a;
     letter-spacing: 0.4px;
+    margin-bottom: 6px;
+}
+
+.empty-sub {
+    font-size: 12px;
+    color: #1e1e1e;
+    letter-spacing: 0.3px;
 }
 
 #empty-state.hidden {
@@ -86,13 +88,11 @@ html, body {
 /* ---- NOTE CARD ---- */
 .note-card {
     width: 100%;
-    min-width: 100%;
+    overflow: hidden;
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 44px 24px 60px 24px;
-    position: relative;
-    flex-shrink: 0;
+    padding: 40px 20px 64px 20px;
 }
 
 .note-text {
@@ -108,7 +108,8 @@ html, body {
     font-family: inherit;
     caret-color: #666;
     overflow-y: auto;
-    padding: 12px 0;
+    overflow-x: hidden;
+    padding: 8px 4px;
     word-wrap: break-word;
     overflow-wrap: break-word;
     white-space: pre-wrap;
@@ -130,16 +131,76 @@ html, body {
 
 .note-text::-webkit-scrollbar {
     width: 0;
+    display: none;
+}
+
+/* ---- CONTROLS LEFT (font size) ---- */
+#controls-left {
+    position: fixed;
+    bottom: 36px;
+    left: 20px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+}
+
+#controls-left.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+#size-down,
+#size-up {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #222;
+    background: #111;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#size-down:active,
+#size-up:active {
+    transform: scale(0.9);
+    background: #1a1a1a;
+    color: #aaa;
+}
+
+#size-down:hover,
+#size-up:hover {
+    background: #1a1a1a;
+    color: #888;
+}
+
+#size-label {
+    font-size: 10px;
+    color: #444;
+    min-width: 22px;
+    text-align: center;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ---- TRASH BUTTON ---- */
 #trash-btn {
     position: fixed;
-    bottom: 40px;
-    right: 24px;
+    bottom: 36px;
+    right: 20px;
     z-index: 200;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 1px solid #222;
     background: #111;
@@ -149,14 +210,15 @@ html, body {
     justify-content: center;
     cursor: pointer;
     opacity: 0;
-    transform: scale(0.8);
+    transform: translateY(8px);
     transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease, color 0.2s ease;
     pointer-events: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #trash-btn.visible {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
     pointer-events: auto;
 }
 
@@ -169,85 +231,6 @@ html, body {
     background: #1a0000;
     color: #c0392b;
     transform: scale(0.9);
-}
-
-/* ---- ADD BUTTON ---- */
-#add-btn {
-    position: fixed;
-    bottom: 40px;
-    left: 24px;
-    z-index: 200;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: 1px solid #222;
-    background: #111;
-    color: #555;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    opacity: 0;
-    transform: scale(0.8);
-    transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease, color 0.2s ease;
-    pointer-events: none;
-}
-
-#add-btn.visible {
-    opacity: 1;
-    transform: scale(1);
-    pointer-events: auto;
-}
-
-#add-btn:hover {
-    background: #1a1a1a;
-    color: #888;
-}
-
-#add-btn:active {
-    background: #001a00;
-    color: #27ae60;
-    transform: scale(0.9);
-}
-
-/* ---- NAV ARROWS (desktop) ---- */
-#nav-arrows {
-    position: fixed;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 200;
-    display: none;
-    gap: 8px;
-    align-items: center;
-}
-
-.nav-arrow {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 1px solid #222;
-    background: #111;
-    color: #555;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, opacity 0.2s ease;
-}
-
-.nav-arrow:hover {
-    background: #1a1a1a;
-    color: #888;
-}
-
-.nav-arrow:active {
-    transform: scale(0.9);
-}
-
-.nav-arrow.disabled {
-    opacity: 0.2;
-    pointer-events: none;
 }
 
 /* ---- CONFIRM MODAL ---- */
@@ -277,7 +260,7 @@ html, body {
     border: 1px solid #222;
     border-radius: 14px;
     padding: 28px 24px 20px;
-    width: 280px;
+    width: 270px;
     text-align: center;
 }
 
@@ -303,6 +286,7 @@ html, body {
     cursor: pointer;
     transition: background 0.15s ease, transform 0.1s ease;
     letter-spacing: 0.3px;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .modal-actions button:active {
@@ -334,26 +318,34 @@ html, body {
 /* ---- DOT INDICATORS ---- */
 #dot-indicators {
     position: fixed;
-    bottom: 16px;
+    bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 150;
     display: flex;
-    gap: 8px;
+    gap: 7px;
     align-items: center;
+    pointer-events: none;
 }
 
 .dot {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: #333;
     transition: background 0.25s ease, transform 0.25s ease;
 }
 
 .dot.active {
-    background: #666;
-    transform: scale(1.3);
+    background: #c0392b;
+    transform: scale(1.5);
+}
+
+.dot-label {
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ---- SAFE AREA ---- */
@@ -363,54 +355,42 @@ html, body {
     }
 
     .note-card {
-        padding-top: calc(44px + env(safe-area-inset-top));
-        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+        padding-top: calc(40px + env(safe-area-inset-top));
+        padding-bottom: calc(64px + env(safe-area-inset-bottom));
     }
 
-    #trash-btn,
-    #add-btn {
-        bottom: calc(40px + env(safe-area-inset-bottom));
+    #trash-btn {
+        bottom: calc(36px + env(safe-area-inset-bottom));
     }
 
-    #nav-arrows {
-        bottom: calc(40px + env(safe-area-inset-bottom));
+    #controls-left {
+        bottom: calc(36px + env(safe-area-inset-bottom));
     }
 
     #dot-indicators {
-        bottom: calc(16px + env(safe-area-inset-bottom));
+        bottom: calc(12px + env(safe-area-inset-bottom));
     }
 }
 
 /* ---- DESKTOP ---- */
 @media (min-width: 768px) {
     .note-card {
-        padding: 52px 48px 80px 48px;
+        padding: 48px 48px 80px 48px;
     }
 
     .note-text {
-        font-size: 17px;
         max-width: 700px;
         line-height: 1.8;
     }
 
-    #trash-btn,
-    #add-btn {
-        width: 44px;
-        height: 44px;
-        bottom: 32px;
-    }
-
     #trash-btn {
+        bottom: 32px;
         right: 32px;
     }
 
-    #add-btn {
-        left: 32px;
-    }
-
-    #nav-arrows {
-        display: flex;
+    #controls-left {
         bottom: 32px;
+        left: 32px;
     }
 
     #dot-indicators {
@@ -418,7 +398,8 @@ html, body {
     }
 
     .note-text::-webkit-scrollbar {
-        width: 4px;
+        width: 3px;
+        display: block;
     }
 
     .note-text::-webkit-scrollbar-track {
@@ -426,50 +407,40 @@ html, body {
     }
 
     .note-text::-webkit-scrollbar-thumb {
-        background: #222;
-        border-radius: 4px;
-    }
-
-    .note-text::-webkit-scrollbar-thumb:hover {
-        background: #333;
+        background: #1a1a1a;
+        border-radius: 3px;
     }
 }
 
-/* ---- DESKTOP LARGE ---- */
 @media (min-width: 1200px) {
     .note-text {
         max-width: 760px;
-        font-size: 18px;
     }
 
     .note-card {
-        padding: 60px 64px 80px 64px;
+        padding: 56px 64px 80px 64px;
     }
 }
 
-/* ---- LANDSCAPE MOBILE ---- */
 @media (orientation: landscape) and (max-height: 500px) {
     .note-card {
-        padding-top: 36px;
-        padding-bottom: 44px;
-    }
-
-    #trash-btn,
-    #add-btn {
-        bottom: 16px;
-        width: 40px;
-        height: 40px;
+        padding-top: 32px;
+        padding-bottom: 48px;
     }
 
     #trash-btn {
-        right: 16px;
+        bottom: 14px;
+        right: 14px;
+        width: 38px;
+        height: 38px;
     }
 
-    #add-btn {
-        left: 16px;
+    #controls-left {
+        bottom: 14px;
+        left: 14px;
     }
 
     #dot-indicators {
-        bottom: 6px;
+        bottom: 4px;
     }
 }
