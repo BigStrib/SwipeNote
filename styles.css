@@ -3,17 +3,15 @@
     padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
-	 scrollbar-width: none;
+    scrollbar-width: none;
     -ms-overflow-style: none;
 }
-
 
 *::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
 }
-
 
 html, body {
     height: 100%;
@@ -35,10 +33,14 @@ html, body {
     left: 0;
     right: 0;
     z-index: 100;
-    padding: 8px 16px;
+    padding: 8px 16px 0 16px;
     background: #000;
     text-align: center;
     pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
 }
 
 #note-count {
@@ -46,6 +48,36 @@ html, body {
     color: #555;
     text-transform: uppercase;
     letter-spacing: 1.5px;
+}
+
+/* ---- DOT INDICATORS ---- */
+#dot-indicators {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    pointer-events: none;
+    padding-bottom: 6px;
+    min-height: 14px;
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #555;
+    transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.dot.active {
+    background: #c0392b;
+    transform: scale(1.5);
+}
+
+.dot-label {
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ---- NOTES CONTAINER ---- */
@@ -102,7 +134,7 @@ html, body {
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 40px 20px 80px 20px;
+    padding: 52px 20px 70px 20px;
 }
 
 .note-text {
@@ -139,15 +171,10 @@ html, body {
     color: #aaa;
 }
 
-.note-text::-webkit-scrollbar {
-    width: 0;
-    display: none;
-}
-
 /* ---- CONTROLS LEFT (font size) ---- */
 #controls-left {
     position: fixed;
-    bottom: 46px;
+    bottom: 24px;
     left: 20px;
     z-index: 200;
     display: flex;
@@ -206,7 +233,7 @@ html, body {
 /* ---- TRASH BUTTON ---- */
 #trash-btn {
     position: fixed;
-    bottom: 46px;
+    bottom: 24px;
     right: 20px;
     z-index: 200;
     width: 44px;
@@ -325,39 +352,6 @@ html, body {
     background: #a93226;
 }
 
-/* ---- DOT INDICATORS ---- */
-#dot-indicators {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 150;
-    display: flex;
-    gap: 7px;
-    align-items: center;
-    pointer-events: none;
-}
-
-.dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #333;
-    transition: background 0.25s ease, transform 0.25s ease;
-}
-
-.dot.active {
-    background: #c0392b;
-    transform: scale(1.5);
-}
-
-.dot-label {
-    font-size: 10px;
-    color: #555;
-    letter-spacing: 1px;
-    font-variant-numeric: tabular-nums;
-}
-
 /* ---- SAFE AREA ---- */
 @supports (padding-top: env(safe-area-inset-top)) {
     #header {
@@ -365,27 +359,23 @@ html, body {
     }
 
     .note-card {
-        padding-top: calc(40px + env(safe-area-inset-top));
-        padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        padding-top: calc(52px + env(safe-area-inset-top));
+        padding-bottom: calc(70px + env(safe-area-inset-bottom));
     }
 
     #trash-btn {
-        bottom: calc(46px + env(safe-area-inset-bottom));
+        bottom: calc(10px + env(safe-area-inset-bottom));
     }
 
     #controls-left {
-        bottom: calc(46px + env(safe-area-inset-bottom));
-    }
-
-    #dot-indicators {
-        bottom: calc(24px + env(safe-area-inset-bottom));
+        bottom: calc(10px + env(safe-area-inset-bottom));
     }
 }
 
 /* ---- DESKTOP ---- */
 @media (min-width: 768px) {
     .note-card {
-        padding: 48px 48px 88px 48px;
+        padding: 56px 48px 80px 48px;
     }
 
     .note-text {
@@ -394,20 +384,15 @@ html, body {
     }
 
     #trash-btn {
-        bottom: 10px;
+        bottom: 32px;
         right: 32px;
     }
 
     #controls-left {
-        bottom: 10px;
+        bottom: 32px;
         left: 32px;
     }
-
-    #dot-indicators {
-        bottom: 14px;
-    }
-
-
+}
 
 @media (min-width: 1200px) {
     .note-text {
@@ -415,29 +400,25 @@ html, body {
     }
 
     .note-card {
-        padding: 56px 64px 88px 64px;
+        padding: 60px 64px 80px 64px;
     }
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
     .note-card {
-        padding-top: 32px;
-        padding-bottom: 56px;
+        padding-top: 44px;
+        padding-bottom: 48px;
     }
 
     #trash-btn {
-        bottom: 10px;
+        bottom: 14px;
         right: 14px;
         width: 38px;
         height: 38px;
     }
 
     #controls-left {
-        bottom: 10px;
+        bottom: 14px;
         left: 14px;
-    }
-
-    #dot-indicators {
-        bottom: 6px;
     }
 }
