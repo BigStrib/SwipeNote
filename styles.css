@@ -144,7 +144,7 @@ body {
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 52px 16px 50px 16px;
+    padding: 52px 16px 54px 16px;
 }
 
 .note-text {
@@ -186,7 +186,7 @@ body {
 #controls-left {
     position: fixed;
     left: 6px;
-    bottom: 4px;
+    bottom: 8px;
     z-index: 200;
     display: flex;
     align-items: center;
@@ -255,7 +255,7 @@ body {
 #trash-btn {
     position: fixed;
     right: 6px;
-    bottom: 4px;
+    bottom: 8px;
     z-index: 200;
     width: 42px;
     height: 42px;
@@ -384,24 +384,24 @@ body {
 
     .note-card {
         padding-top: calc(52px + env(safe-area-inset-top));
-        padding-bottom: calc(50px + env(safe-area-inset-bottom));
+        padding-bottom: calc(54px + env(safe-area-inset-bottom));
     }
 
     #controls-left {
         left: calc(6px + env(safe-area-inset-left));
-        bottom: calc(4px + env(safe-area-inset-bottom));
+        bottom: calc(8px + env(safe-area-inset-bottom));
     }
 
     #trash-btn {
         right: calc(6px + env(safe-area-inset-right));
-        bottom: calc(4px + env(safe-area-inset-bottom));
+        bottom: calc(8px + env(safe-area-inset-bottom));
     }
 }
 
 /* ---- TABLET ---- */
 @media (min-width: 768px) {
     .note-card {
-        padding: 56px 28px 54px 28px;
+        padding: 56px 28px 58px 28px;
     }
 
     .note-text {
@@ -411,12 +411,12 @@ body {
 
     #controls-left {
         left: 12px;
-        bottom: 10px;
+        bottom: 12px;
     }
 
     #trash-btn {
         right: 12px;
-        bottom: 10px;
+        bottom: 12px;
         width: 44px;
         height: 44px;
     }
@@ -429,17 +429,17 @@ body {
     }
 
     .note-card {
-        padding: 60px 48px 56px 48px;
+        padding: 60px 48px 60px 48px;
     }
 
     #controls-left {
         left: 18px;
-        bottom: 14px;
+        bottom: 16px;
     }
 
     #trash-btn {
         right: 18px;
-        bottom: 14px;
+        bottom: 16px;
     }
 }
 
