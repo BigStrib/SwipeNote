@@ -13,7 +13,8 @@
     height: 0;
 }
 
-html, body {
+html,
+body {
     height: 100%;
     width: 100%;
     overflow: hidden;
@@ -130,11 +131,12 @@ html, body {
 /* ---- NOTE CARD ---- */
 .note-card {
     width: 100%;
+    min-height: 100svh;
     overflow: hidden;
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 52px 20px 70px 20px;
+    padding: 52px 16px 96px 16px;
 }
 
 .note-text {
@@ -151,7 +153,7 @@ html, body {
     caret-color: #666;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 8px 4px;
+    padding: 8px 6px 82px 6px;
     word-wrap: break-word;
     overflow-wrap: break-word;
     white-space: pre-wrap;
@@ -159,6 +161,7 @@ html, body {
     -webkit-user-select: text;
     -webkit-overflow-scrolling: touch;
     cursor: text;
+    scroll-padding-bottom: 82px;
 }
 
 .note-text:empty::before {
@@ -171,19 +174,25 @@ html, body {
     color: #aaa;
 }
 
-/* ---- CONTROLS LEFT (font size) ---- */
+/* ---- FONT SIZE CONTROLS ---- */
 #controls-left {
     position: fixed;
-    bottom: 24px;
-    left: 10px;
+    left: 6px;
+    bottom: 6px;
     z-index: 200;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.25s ease, transform 0.25s ease;
     pointer-events: none;
+    background: rgba(17, 17, 17, 0.96);
+    border: 1px solid #222;
+    border-radius: 999px;
+    padding: 4px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 #controls-left.visible {
@@ -194,53 +203,56 @@ html, body {
 
 #size-down,
 #size-up {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    border: 1px solid #222;
-    background: #111;
-    color: #555;
+    border: none;
+    background: transparent;
+    color: #666;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
     -webkit-tap-highlight-color: transparent;
-}
-
-#size-down:active,
-#size-up:active {
-    transform: scale(0.9);
-    background: #1a1a1a;
-    color: #aaa;
+    touch-action: manipulation;
 }
 
 #size-down:hover,
 #size-up:hover {
     background: #1a1a1a;
-    color: #888;
+    color: #999;
+}
+
+#size-down:active,
+#size-up:active {
+    transform: scale(0.92);
+    background: #1a1a1a;
+    color: #bbb;
 }
 
 #size-label {
-    font-size: 10px;
-    color: #444;
-    min-width: 22px;
+    font-size: 9px;
+    color: #555;
+    min-width: 20px;
     text-align: center;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     font-variant-numeric: tabular-nums;
+    line-height: 1;
+    padding: 0 2px;
 }
 
 /* ---- TRASH BUTTON ---- */
 #trash-btn {
     position: fixed;
-    bottom: 24px;
-    right: 20px;
+    right: 6px;
+    bottom: 6px;
     z-index: 200;
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     border: 1px solid #222;
-    background: #111;
+    background: rgba(17, 17, 17, 0.96);
     color: #555;
     display: flex;
     align-items: center;
@@ -251,6 +263,9 @@ html, body {
     transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease, color 0.2s ease;
     pointer-events: none;
     -webkit-tap-highlight-color: transparent;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    touch-action: manipulation;
 }
 
 #trash-btn.visible {
@@ -267,7 +282,7 @@ html, body {
 #trash-btn:active {
     background: #1a0000;
     color: #c0392b;
-    transform: scale(0.9);
+    transform: scale(0.92);
 }
 
 /* ---- CONFIRM MODAL ---- */
@@ -352,7 +367,7 @@ html, body {
     background: #a93226;
 }
 
-/* ---- SAFE AREA ---- */
+/* ---- SAFE AREA SUPPORT ---- */
 @supports (padding-top: env(safe-area-inset-top)) {
     #header {
         padding-top: calc(8px + env(safe-area-inset-top));
@@ -360,37 +375,48 @@ html, body {
 
     .note-card {
         padding-top: calc(52px + env(safe-area-inset-top));
-        padding-bottom: calc(70px + env(safe-area-inset-bottom));
+        padding-bottom: calc(96px + env(safe-area-inset-bottom));
     }
 
-    #trash-btn {
-        bottom: calc(10px + env(safe-area-inset-bottom));
+    .note-text {
+        padding-bottom: calc(82px + env(safe-area-inset-bottom));
+        scroll-padding-bottom: calc(82px + env(safe-area-inset-bottom));
     }
 
     #controls-left {
-        bottom: calc(10px + env(safe-area-inset-bottom));
+        left: calc(6px + env(safe-area-inset-left));
+        bottom: calc(6px + env(safe-area-inset-bottom));
+    }
+
+    #trash-btn {
+        right: calc(6px + env(safe-area-inset-right));
+        bottom: calc(6px + env(safe-area-inset-bottom));
     }
 }
 
-/* ---- DESKTOP ---- */
+/* ---- SLIGHTLY LARGER PHONES / TABLETS ---- */
 @media (min-width: 768px) {
     .note-card {
-        padding: 56px 48px 80px 48px;
+        padding: 56px 28px 104px 28px;
     }
 
     .note-text {
         max-width: 700px;
         line-height: 1.8;
-    }
-
-    #trash-btn {
-        bottom: 32px;
-        right: 32px;
+        padding-bottom: 86px;
+        scroll-padding-bottom: 86px;
     }
 
     #controls-left {
-        bottom: 32px;
-        left: 32px;
+        left: 12px;
+        bottom: 12px;
+    }
+
+    #trash-btn {
+        right: 12px;
+        bottom: 12px;
+        width: 40px;
+        height: 40px;
     }
 }
 
@@ -400,25 +426,48 @@ html, body {
     }
 
     .note-card {
-        padding: 60px 64px 80px 64px;
-    }
-}
-
-@media (orientation: landscape) and (max-height: 500px) {
-    .note-card {
-        padding-top: 44px;
-        padding-bottom: 48px;
-    }
-
-    #trash-btn {
-        bottom: 14px;
-        right: 14px;
-        width: 38px;
-        height: 38px;
+        padding: 60px 48px 108px 48px;
     }
 
     #controls-left {
-        bottom: 14px;
-        left: 10px;
+        left: 18px;
+        bottom: 18px;
+    }
+
+    #trash-btn {
+        right: 18px;
+        bottom: 18px;
+    }
+}
+
+/* ---- SHORT / LANDSCAPE MOBILE ---- */
+@media (orientation: landscape) and (max-height: 500px) {
+    .note-card {
+        padding-top: 44px;
+        padding-bottom: 82px;
+    }
+
+    .note-text {
+        padding-bottom: 70px;
+        scroll-padding-bottom: 70px;
+    }
+
+    #controls-left {
+        left: 6px;
+        bottom: 6px;
+        padding: 3px;
+    }
+
+    #size-down,
+    #size-up {
+        width: 28px;
+        height: 28px;
+    }
+
+    #trash-btn {
+        right: 6px;
+        bottom: 6px;
+        width: 34px;
+        height: 34px;
     }
 }
