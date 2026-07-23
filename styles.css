@@ -27,6 +27,14 @@ body {
     -webkit-user-select: none;
 }
 
+html {
+    background: #000;
+}
+
+body {
+    background: #000;
+}
+
 /* ---- HEADER ---- */
 #header {
     position: fixed;
@@ -136,7 +144,7 @@ body {
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 52px 16px 44px 16px;
+    padding: 52px 16px 50px 16px;
 }
 
 .note-text {
@@ -153,7 +161,7 @@ body {
     caret-color: #666;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 8px 6px 8px 6px;
+    padding: 8px 6px 6px 6px;
     word-wrap: break-word;
     overflow-wrap: break-word;
     white-space: pre-wrap;
@@ -161,7 +169,7 @@ body {
     -webkit-user-select: text;
     -webkit-overflow-scrolling: touch;
     cursor: text;
-    scroll-padding-bottom: 8px;
+    scroll-padding-bottom: 6px;
 }
 
 .note-text:empty::before {
@@ -178,7 +186,7 @@ body {
 #controls-left {
     position: fixed;
     left: 6px;
-    bottom: 2px;
+    bottom: 4px;
     z-index: 200;
     display: flex;
     align-items: center;
@@ -190,7 +198,7 @@ body {
     background: rgba(17, 17, 17, 0.96);
     border: 1px solid #222;
     border-radius: 999px;
-    padding: 3px;
+    padding: 4px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
 }
@@ -203,12 +211,13 @@ body {
 
 #size-down,
 #size-up {
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     border: none;
     background: transparent;
     color: #666;
+    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -232,24 +241,24 @@ body {
 }
 
 #size-label {
-    font-size: 9px;
+    font-size: 10px;
     color: #555;
-    min-width: 18px;
+    min-width: 22px;
     text-align: center;
     letter-spacing: 0.4px;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    padding: 0 1px;
+    padding: 0 2px;
 }
 
 /* ---- TRASH BUTTON ---- */
 #trash-btn {
     position: fixed;
     right: 6px;
-    bottom: 2px;
+    bottom: 4px;
     z-index: 200;
-    width: 34px;
-    height: 34px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     border: 1px solid #222;
     background: rgba(17, 17, 17, 0.96);
@@ -375,24 +384,24 @@ body {
 
     .note-card {
         padding-top: calc(52px + env(safe-area-inset-top));
-        padding-bottom: calc(44px + env(safe-area-inset-bottom));
+        padding-bottom: calc(50px + env(safe-area-inset-bottom));
     }
 
     #controls-left {
         left: calc(6px + env(safe-area-inset-left));
-        bottom: calc(2px + env(safe-area-inset-bottom));
+        bottom: calc(4px + env(safe-area-inset-bottom));
     }
 
     #trash-btn {
         right: calc(6px + env(safe-area-inset-right));
-        bottom: calc(2px + env(safe-area-inset-bottom));
+        bottom: calc(4px + env(safe-area-inset-bottom));
     }
 }
 
 /* ---- TABLET ---- */
 @media (min-width: 768px) {
     .note-card {
-        padding: 56px 28px 48px 28px;
+        padding: 56px 28px 54px 28px;
     }
 
     .note-text {
@@ -401,15 +410,15 @@ body {
     }
 
     #controls-left {
-        left: 10px;
-        bottom: 8px;
+        left: 12px;
+        bottom: 10px;
     }
 
     #trash-btn {
-        right: 10px;
-        bottom: 8px;
-        width: 38px;
-        height: 38px;
+        right: 12px;
+        bottom: 10px;
+        width: 44px;
+        height: 44px;
     }
 }
 
@@ -420,17 +429,17 @@ body {
     }
 
     .note-card {
-        padding: 60px 48px 52px 48px;
+        padding: 60px 48px 56px 48px;
     }
 
     #controls-left {
-        left: 14px;
-        bottom: 12px;
+        left: 18px;
+        bottom: 14px;
     }
 
     #trash-btn {
-        right: 14px;
-        bottom: 12px;
+        right: 18px;
+        bottom: 14px;
     }
 }
 
@@ -438,25 +447,25 @@ body {
 @media (orientation: landscape) and (max-height: 500px) {
     .note-card {
         padding-top: 44px;
-        padding-bottom: 38px;
+        padding-bottom: 44px;
     }
 
     #controls-left {
-        left: 4px;
-        bottom: 2px;
-        padding: 2px;
+        left: 6px;
+        bottom: 3px;
+        padding: 3px;
     }
 
     #size-down,
     #size-up {
-        width: 26px;
-        height: 26px;
+        width: 30px;
+        height: 30px;
     }
 
     #trash-btn {
-        right: 4px;
-        bottom: 2px;
-        width: 30px;
-        height: 30px;
+        right: 6px;
+        bottom: 3px;
+        width: 36px;
+        height: 36px;
     }
 }
