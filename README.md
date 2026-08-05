@@ -1,10 +1,8 @@
 <p align="center">
-  <img width="600" height="600" alt="1764929524376-019aedff-0369-7577-8102-9bc966ea56c1" src="https://github.com/user-attachments/assets/3afbe877-b9fe-4c90-b08b-dea7f4e7d83d" />
-
+  A clean and professional description of your project goes here. Keep it short, clear, and direct.
 </p>
 
-
 <p align="center">
-  A short, clear description of your project.  
-  Explain what it does in one or two professional sentences.
+<img width="700" height="700" alt="1764929524376-019aedff-0369-7577-8102-9bc966ea56c1" src="https://github.com/user-attachments/assets/caa6dba4-4dfa-4e70-834c-7e567d8098e6" />
+
 </p>
